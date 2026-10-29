@@ -1,0 +1,62 @@
+{
+  "name": "dsh-basin-whale-pet",
+  "version": "1.0.0",
+  "description": "DSH 桌面宠物：头顶不锈钢盆的 Q 版女仆鲸鱼娘，显示 DeepSeek 余额、赠金/充值、今日已用与峰谷时段（含 24 小时条带与切换倒计时）；点一下盆会把它击飞，鲸鱼娘跑过去捡回来扣回头上",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "desktop-pet",
+    "live2d-alternative",
+    "balance",
+    "peak-valley",
+    "pricing",
+    "widget"
+  ],
+  "type": "module",
+  "main": "index.js",
+  "icon": "./icon.svg",
+  "license": "MIT",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "npm run check:syntax && npm run check:tests && npm run check:ids && npm run preflight",
+    "check:syntax": "node --check index.js && node --check client.js",
+    "check:ids": "node scripts/cross-check.mjs",
+    "check:tests": "node scripts/selfcheck.mjs && node scripts/host-smoke.mjs && node scripts/smoke.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "upload": "node scripts/upload.mjs",
+    "preview": "node scripts/render-shot.mjs idle",
+    "prepublishOnly": "node scripts/preflight.mjs && node --check index.js && node --check client.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yueshang-cmd/dsh-basin-whale-pet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yueshang-cmd/dsh-basin-whale-pet/issues"
+  },
+  "homepage": "https://github.com/yueshang-cmd/dsh-basin-whale-pet#readme",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  }
+}

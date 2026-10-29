@@ -1,0 +1,19 @@
+# 依赖与本地开发产物
+node_modules/
+.pnpm-store/
+
+# 打包与预览产物（不要提交：tgz 里已含全部发布文件，预览 HTML 由 npm run preview 生成）
+*.tgz
+basin-preview/
+
+# 测试临时物
+scripts/.selfcheck-logic.mjs
+_npmcache/
+_ud/
+*.log
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

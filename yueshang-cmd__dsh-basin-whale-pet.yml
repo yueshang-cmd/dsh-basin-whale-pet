@@ -1,0 +1,35 @@
+# awesome-dsh-plugin 目录投稿
+#
+# 规则（contributing.md）：一个插件一个文件，放在 data/plugins/，文件名 = <owner>__<repo>.yml
+# 两个 README 由脚本生成，不要手工编辑。所以这个文件要**改名**成你自己的 owner：
+#
+#     yueshang-cmd__dsh-basin-whale-pet.yml
+#
+# 并把下面 url / name / icon 三处的 yueshang-cmd 全部替换成同一个真实 owner。
+# 替换前请确认三处完全一致 —— 目录会拿 url 与仓库逐字比对，不一致 CI 直接拒。
+
+url: https://github.com/yueshang-cmd/dsh-basin-whale-pet
+name: yueshang-cmd/dsh-basin-whale-pet
+category: ui
+description:
+  en: >-
+    Chibi maid-whale desktop pet wearing an upside-down stainless-steel basin,
+    showing DeepSeek balance, bonus and top-up wallets, observed today's spend,
+    and peak vs off-peak pricing with a 24-hour band and switch countdown. Click
+    the basin to knock it away — physics, edge bounces, tumble — and the whale
+    girl runs after it and puts it back on her head. Tapping her refreshes the
+    balance. Pure hand-written SVG artwork and WebAudio-synthesized sounds, so
+    the package ships no image, audio or font assets. Read-only same-origin
+    route, loopback-guarded.
+  zh: >-
+    头顶倒扣不锈钢盆的 Q 版女仆鲸鱼娘桌面宠物：显示 DeepSeek 余额、赠金与充值、
+    观测出的今日已用，以及峰谷时段（含 24 小时条带与切换倒计时）。点一下盆会把它击飞
+    ——抛物线、撞边弹回、翻滚落地——鲸鱼娘再跑过去把盆捡回来扣回头上；点她则刷新余额。
+    美术是手写 SVG，音效运行期 WebAudio 合成，包里不含任何图片/音频/字体素材。
+    只读同源路由，带回环与同源校验。
+
+# 可选：市场卡片图标。目录只接受 **GitHub 托管的位图**（png/jpg/jpeg/webp），
+# 拒绝 SVG 与第三方图床；不写则回退成你的 GitHub 头像。
+# 本仓库目前只有 icon.svg（宿主插件列表用它，格式合规）。要填这项就得先产出一张
+# 方形位图（约 180×180），放到仓库 assets/icon-180.png 再取消注释。
+# icon: https://raw.githubusercontent.com/yueshang-cmd/dsh-basin-whale-pet/main/assets/icon-180.png

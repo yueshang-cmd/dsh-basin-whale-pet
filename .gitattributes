@@ -1,0 +1,25 @@
+# 行尾统一 LF。
+#
+# 为什么必须写这个：本机 / 部分 Windows 部署带了系统级 core.autocrlf=true，
+# 会把仓库内容转成 CRLF，而 `npm publish` 打的是工作区文件 ——
+# 两边字节就不一致了（本插件的路由与包名靠逐字比对校验，不该被行尾差异影响）。
+# 跟着仓库走，对所有克隆者一致，与各自 git 配置无关。
+* text=auto eol=lf
+
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.json text eol=lf
+*.yml  text eol=lf
+*.md   text eol=lf
+*.svg  text eol=lf
+LICENSE text eol=lf
+.gitignore text eol=lf
+
+# 真正的二进制留原样（本包目前没有，写上以免以后加素材时踩坑）
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.wav binary
+*.mp3 binary
