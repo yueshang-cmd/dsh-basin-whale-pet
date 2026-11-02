@@ -159,37 +159,76 @@ window.__ModuleLoader__.load({
     // ======================================================================
     // 美术：不锈钢盆（倒扣，开口朝下）—— 飞行中用
     // ======================================================================
+    /**
+     * 不锈钢盆的**唯一**一份几何。头上那只与飞行中那只都调它，
+     * 所以交接瞬间不可能跳尺寸（旧版是两份手写路径，靠注释换算式凑）。
+     *
+     * 图层顺序即遮挡关系，从后到前：内壁 → 外壁 → 盆口环带（壁厚）→ 收边暗线
+     *   → 拉丝高光 → 底部压痕 → 星闪。
+     * 内壁画在最底、且比外壁暗一档 —— 从盆口斜看得到"里面"，这是它不像贴纸的关键。
+     * viewBox 120×78 保持不变（飞行层尺寸换算依赖它），盆体占 x 12..108、y 12..66。
+     */
+    function basinShapes(g) {
+      return [
+        h('defs', null,
+          h('linearGradient', { id: g + '-out', x1: '0', y1: '.05', x2: '1', y2: '.95' },
+            h('stop', { offset: '0', stopColor: '#5b6472' }),
+            h('stop', { offset: '.12', stopColor: '#aeb9c7' }),
+            h('stop', { offset: '.26', stopColor: '#f4f8fd' }),
+            h('stop', { offset: '.40', stopColor: '#8f9caa' }),
+            h('stop', { offset: '.52', stopColor: '#c9d4e0' }),
+            h('stop', { offset: '.66', stopColor: '#eaf1f8' }),
+            h('stop', { offset: '.80', stopColor: '#7e8a99' }),
+            h('stop', { offset: '1', stopColor: '#4a5260' })),
+          // 内壁：光从盆口进来，所以渐变方向与外壁相反、整体暗一档
+          h('linearGradient', { id: g + '-in', x1: '.2', y1: '1', x2: '.8', y2: '0' },
+            h('stop', { offset: '0', stopColor: '#39414d' }),
+            h('stop', { offset: '.45', stopColor: '#5d6875' }),
+            h('stop', { offset: '1', stopColor: '#8d99a8' })),
+          // 环带（壁厚）用竖向渐变：上缘亮、下缘暗，读起来才有厚度
+          h('linearGradient', { id: g + '-rim', x1: '0', y1: '0', x2: '0', y2: '1' },
+            h('stop', { offset: '0', stopColor: '#eef3f9' }),
+            h('stop', { offset: '.4', stopColor: '#b3bfce' }),
+            h('stop', { offset: '.6', stopColor: '#8593a3' }),
+            h('stop', { offset: '1', stopColor: '#5a6472' }))),
+        // ① 内壁（盆口是个椭圆，能看到一圈内表面）
+        h('path', { d: 'M12,56 C12,68 108,68 108,56 C108,62 12,62 12,56 Z', fill: 'url(#' + g + '-in)' }),
+        h('path', { d: 'M16,58 C34,66 86,66 104,58', stroke: 'rgba(255,255,255,.22)', strokeWidth: '1.6', fill: 'none', strokeLinecap: 'round' }),
+        // ② 外壁（倒扣穹顶，开口朝下）
+        h('path', { d: 'M14,58 C14,34 26,12 60,12 C94,12 106,34 106,58 Z', fill: 'url(#' + g + '-out)', stroke: '#414a58', strokeWidth: '2', strokeLinejoin: 'round' }),
+        // ③ 盆口环带 = 壁厚
+        h('path', { d: 'M12,56 C12,67 108,67 108,56 C108,61 12,61 12,56 Z', fill: 'url(#' + g + '-rim)', stroke: '#3d4552', strokeWidth: '2', strokeLinejoin: 'round' }),
+        // ④ 环带下缘收边
+        h('path', { d: 'M16,61 C34,69 86,69 104,61', stroke: 'rgba(24,32,44,.5)', strokeWidth: '2.2', fill: 'none', strokeLinecap: 'round' }),
+        // ⑤ 拉丝高光 + 一道暗带，跟随穹顶曲率
+        h('path', { d: 'M28,54 C28,34 36,17 49,13', stroke: 'rgba(255,255,255,.78)', strokeWidth: '4', fill: 'none', strokeLinecap: 'round' }),
+        h('path', { d: 'M80,53 C80,36 86,23 93,18', stroke: 'rgba(255,255,255,.44)', strokeWidth: '2.4', fill: 'none', strokeLinecap: 'round' }),
+        h('path', { d: 'M20,50 C22,37 27,26 33,20', stroke: 'rgba(38,48,62,.26)', strokeWidth: '2.2', fill: 'none', strokeLinecap: 'round' }),
+        // ⑥ 盆底（倒扣后的最顶）压痕
+        h('ellipse', { cx: '60', cy: '15', rx: '13.5', ry: '4.2', fill: 'rgba(255,255,255,.3)', stroke: 'rgba(66,76,92,.5)', strokeWidth: '1.3' }),
+        // ⑦ 星闪
+        h('path', { className: 'bw-sparkle', d: 'M42,26 l3,-7.6 l3,7.6 l7.6,3 l-7.6,3 l-3,7.6 l-3,-7.6 l-7.6,-3 Z', fill: '#ffffff' }),
+      ]
+    }
+
+    /** 飞行中的盆：同几何，按 viewBox 原尺寸渲染 */
     function Basin({ uid, size }) {
-      const g = 'bf-' + uid
       return h('svg', {
         viewBox: '0 0 120 78', width: size, height: size * 0.65, 'aria-hidden': 'true',
         style: { display: 'block', overflow: 'visible' },
-      },
-        h('defs', null,
-          h('linearGradient', { id: g, x1: '0', y1: '0.1', x2: '1', y2: '0.9' },
-            h('stop', { offset: '0', stopColor: '#5f6874' }),
-            h('stop', { offset: '.14', stopColor: '#b7c2cf' }),
-            h('stop', { offset: '.3', stopColor: '#f6f9fd' }),
-            h('stop', { offset: '.46', stopColor: '#9aa5b3' }),
-            h('stop', { offset: '.62', stopColor: '#eef3f9' }),
-            h('stop', { offset: '.78', stopColor: '#8d98a6' }),
-            h('stop', { offset: '1', stopColor: '#525a66' })),
-          h('linearGradient', { id: g + '-rim', x1: '0', y1: '0', x2: '0', y2: '1' },
-            h('stop', { offset: '0', stopColor: '#e3eaf2' }),
-            h('stop', { offset: '1', stopColor: '#6b7480' })),
-        ),
-        h('path', {
-          d: 'M14,58 C14,34 26,12 60,12 C94,12 106,34 106,58 Z',
-          fill: 'url(#' + g + ')', stroke: '#4b5361', strokeWidth: '1.8', strokeLinejoin: 'round',
-        }),
-        h('path', { d: 'M30,55 C30,34 38,17 52,14', stroke: 'rgba(255,255,255,.72)', strokeWidth: '3.2', fill: 'none', strokeLinecap: 'round' }),
-        h('path', { d: 'M78,54 C78,36 84,22 92,18', stroke: 'rgba(255,255,255,.45)', strokeWidth: '2.2', fill: 'none', strokeLinecap: 'round' }),
-        h('path', { d: 'M20,50 C22,38 27,28 34,22', stroke: 'rgba(40,50,64,.28)', strokeWidth: '2', fill: 'none', strokeLinecap: 'round' }),
-        h('ellipse', { cx: '60', cy: '16', rx: '13', ry: '4.2', fill: 'rgba(255,255,255,.35)', stroke: 'rgba(70,80,95,.5)', strokeWidth: '1.1' }),
-        h('path', { d: 'M12,56 C12,66 108,66 108,56 C108,52 12,52 12,56 Z', fill: 'url(#' + g + '-rim)', stroke: '#454d5a', strokeWidth: '1.8', strokeLinejoin: 'round' }),
-        h('path', { d: 'M16,60 C30,66 90,66 104,60', stroke: 'rgba(30,38,50,.55)', strokeWidth: '2', fill: 'none', strokeLinecap: 'round' }),
-        h('path', { d: 'M40,26 l2.6,-6.4 l2.6,6.4 l6.4,2.6 l-6.4,2.6 l-2.6,6.4 l-2.6,-6.4 l-6.4,-2.6 Z', fill: 'rgba(255,255,255,.92)' }),
-      )
+      }, ...basinShapes('bf-' + uid))
+    }
+
+    /**
+     * 头上的盆：同几何，缩放到与飞行盆**完全相同的像素尺寸**（96×1.2083 = 116 = basinBodyW），
+     * 再平移到头顶锚点。scale 由 BASIN_SCALE 单一来源给出，不写魔数。
+     */
+    function HeadBasin(g) {
+      // 外层定位（属性 transform，无 CSS 动画）+ 内层晃头（CSS animation 设 transform）。
+      // 合成一个元素会被 CSS 覆盖，见上方注释。
+      return h('g', {
+        transform: 'translate(110 49.5) scale(' + BASIN_SCALE.toFixed(4) + ') translate(-60 -39)',
+      }, h('g', { className: 'bw-head-basin' }, ...basinShapes(g + '-hb')))
     }
 
     // ======================================================================
@@ -308,19 +347,13 @@ window.__ModuleLoader__.load({
             d: 'M56,74 q5,-14 17,-11 q4,-13 16,-10 q5,-13 17,-10 q6,-12 18,-8 q6,-11 18,-7 q6,-9 18,-5 q8,-6 16,-2',
             stroke: '#f8fbff', strokeWidth: '9.5', fill: 'none', strokeLinecap: 'round',
           }),
-        ),
 
-        // 头上的盆
-        basinOnHead ? h('g', { className: 'bw-head-basin' },
-          h('path', { d: 'M54,72 C54,40 69,16 110,16 C151,16 166,40 166,72 Z', fill: 'url(#' + g + '-steel)', stroke: '#454d5a', strokeWidth: '2.4', strokeLinejoin: 'round' }),
-          h('path', { d: 'M74,66 C74,40 84,22 100,18', stroke: 'rgba(255,255,255,.75)', strokeWidth: '4.5', fill: 'none', strokeLinecap: 'round' }),
-          h('path', { d: 'M138,63 C138,42 146,28 154,24', stroke: 'rgba(255,255,255,.42)', strokeWidth: '2.6', fill: 'none', strokeLinecap: 'round' }),
-          h('path', { d: 'M66,60 C68,44 74,32 82,25', stroke: 'rgba(45,55,70,.22)', strokeWidth: '2.4', fill: 'none', strokeLinecap: 'round' }),
-          h('ellipse', { cx: '110', cy: '21', rx: '15', ry: '5', fill: 'rgba(255,255,255,.3)', stroke: 'rgba(70,80,95,.45)', strokeWidth: '1.3' }),
-          h('path', { d: 'M52,70 C52,83 168,83 168,70 C168,65 52,65 52,70 Z', fill: '#bcc7d4', stroke: '#454d5a', strokeWidth: '2.4', strokeLinejoin: 'round' }),
-          h('path', { d: 'M59,77 C80,86 140,86 161,77', stroke: 'rgba(30,38,50,.5)', strokeWidth: '2.6', fill: 'none', strokeLinecap: 'round' }),
-          h('path', { className: 'bw-sparkle', d: 'M92,32 l3.2,-8.4 l3.2,8.4 l8.4,3.2 l-8.4,3.2 l-3.2,8.4 l-3.2,-8.4 l-8.4,-3.2 Z', fill: '#ffffff' }),
-        ) : null,
+          // —— 头上的盆：必须是 .bw-body 的**子节点** ——
+          // 旧版画在 body 组之外（svg 的兄弟节点），而 body 挂着 breathe（缩放+上下位移）
+          // 与 waddle（rotate ±5°）两个动画：身体在动、盆不动 ⇒ 呼吸时头顶陷进盆里、
+          // 走路时盆从头上滑出去，这就是「穿模」。放进组内即刚性继承，相对位置恒为常量。
+          basinOnHead ? HeadBasin(g) : null,
+        ),
 
         // 汗滴（追/搬）
         h('g', { className: 'bw-sweat' },
@@ -450,6 +483,8 @@ window.__ModuleLoader__.load({
     const HEAD = { x: WHALE_X + 110, y: SVG_Y0 + 50 }  // 头上盆的视觉中心（舞台坐标）
     const GROUND_INNER = SVG_Y0 + 214                 // 舞台内地面线（影子在 svg y=214）
     const BASIN_BODY_W = 116, BASIN_BODY_H = 65
+    // 头上盆与飞行盆等大的换算：盆体在 viewBox 内占 96 宽，放大到 116
+    const BASIN_SCALE = BASIN_BODY_W / 96
     // 飞行盆与头上盆必须等大才能无缝交接：Basin 的 viewBox 120×78 里盆体占 x 12..108，
     // 所以宽 145（96/120×145 = 116 = 头上盆宽），高按比例 94。
     const FLY_W = Math.round(BASIN_BODY_W * 120 / 96)
