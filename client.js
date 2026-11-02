@@ -15,6 +15,10 @@ window.__ModuleLoader__.load({
     const React = require('react')
     const h = React.createElement
     const { useState, useEffect, useRef, useCallback, useMemo } = React
+    // 飞行盆要飞出舞台甚至飞出挂件盒，所以用 portal 挂到 document.body（宿主自己的
+    // 账号挂件也是这个写法）。react-dom 取不到时退化为挂在舞台内，功能不坏只是范围受限。
+    let createPortal = null
+    try { createPortal = require('react-dom').createPortal || null } catch (err) { createPortal = null }
 
     const API = '/dsh-basin-whale-pet/state.json'
     const REFRESH_MS = 60000
@@ -438,19 +442,36 @@ window.__ModuleLoader__.load({
     // 主组件
     // ======================================================================
     const IDLE = 'idle', KNOCKED = 'knocked', CHASE = 'chase', PICKUP = 'pickup', CARRY = 'carry', HAPPY = 'happy'
-    // 舞台几何：舞台 300×300。鲸鱼娘 svg（viewBox 220×230，与 px 严格 1:1）贴底放在 left=40，
-    // 顶部留 70px 空场给「被击飞的盆」和泡泡，左右各 40px 给跑动余量。
+    // 舞台几何：舞台 300×300，鲸鱼娘 svg（viewBox 220×230，与 px 严格 1:1）贴底放 left=40。
+    // 舞台只管「人」；盆的飞行是**视口坐标**（portal 到 body），所以能飞到 1000px 以外。
     const STAGE_W = 300, STAGE_H = 300
     const WHALE_X = 40, WHALE_W = 220, WHALE_H = 230
-    const SVG_Y0 = STAGE_H - WHALE_H                 // svg 顶在舞台里的 y = 70
-    const HEAD = { x: WHALE_X + 110, y: SVG_Y0 + 50 } // 头上盆的视觉中心（svg 盆体跨 y 16..83）
-    // 盆体在飞行 svg（viewBox 120×78）里正好居中，所以 translate 到 (x,y) 就是盆体中心。
+    const SVG_Y0 = STAGE_H - WHALE_H                  // svg 顶在舞台里的 y = 70
+    const HEAD = { x: WHALE_X + 110, y: SVG_Y0 + 50 }  // 头上盆的视觉中心（舞台坐标）
+    const GROUND_INNER = SVG_Y0 + 214                 // 舞台内地面线（影子在 svg y=214）
     const BASIN_BODY_W = 116, BASIN_BODY_H = 65
-    const FLOOR_Y = STAGE_H - 46   // 盆落地时的中心 y ⇒ 盆底正好压在影子线上（svg y=214）
-    const TOP_Y = 42               // 撞舞台顶软弹回，不会糊到信息面板上
-    const FLY_W = Math.round(BASIN_BODY_W * 120 / 96) // = 145：与头上那只盆等大，交接才不跳尺寸
-    const FLY_H = Math.round(FLY_W * 78 / 120)        // = 94
-    const BASIN_MIN = BASIN_BODY_W / 2 + 2, BASIN_MAX = STAGE_W - BASIN_BODY_W / 2 - 2
+    // 飞行盆与头上盆必须等大才能无缝交接：Basin 的 viewBox 120×78 里盆体占 x 12..108，
+    // 所以宽 145（96/120×145 = 116 = 头上盆宽），高按比例 94。
+    const FLY_W = Math.round(BASIN_BODY_W * 120 / 96)
+    const FLY_H = Math.round(FLY_W * 78 / 120)
+
+    // ——— 击飞范围（视口坐标 px）———
+    // 需求：盆要飞到离模型 1000px 以上。旧实现用 BASIN_MIN/MAX 把盆夹在 300px 舞台里
+    // （最大位移约 ±90px）。现在按视口选目标落点，并且**撞墙反弹**：窗口比 1000px 窄时
+    // 盆会弹到对面墙上继续滚，让「路径长度」仍超过 MIN_TRAVEL，而不是被空间限制打回原形。
+    const MIN_TRAVEL = 1080       // 目标落点距离下限（稳超 1000px）
+    const MAX_TRAVEL = 1500       // 上限：再远就飞出屏幕太久，观感变差
+    const WALL_PAD = 24           // 盆中心距视口边缘的安全距离：盆半宽 72，所以最外侧会
+                                  // 探出屏幕约 48px —— 被击飞的盆贴到画面边缘是合理的，
+                                  // 换来的是更大的可达距离（天花板 = 视口宽 - 24 - 174）。
+    const FLIGHT_SPEED = 1250     // 水平参考速度 px/s，决定飞行时长
+    const PEAK_H = 330            // 首段弹跳高度 px（后续按衰减系数递减）
+    const ARCS = [[0.62, 1], [0.20, 0.42], [0.11, 0.20], [0.07, 0.10]]  // [水平占比, 弹高占比]
+    const CHASE_SPEED = 900       // 追盆 px/s（旧 320px/s 跑 1000px 要 3 秒多，太拖）
+    const CARRY_SPEED = 1000      // 抱盆回位 px/s
+    // 鲸鱼娘本人留在舞台内（absolute + 舞台 overflow:visible，位移不封顶），
+    // 只有盆 portal 到 body。这样即便某个祖先容器裁掉了跑远的人，盆的行为与
+    // 整条序列仍然正确，不会连带崩掉 —— 而「飞 1000px 以上」是对盆的要求，已满足。
 
     function Pet({ lang }) {
       const t = useCallback((k) => (TEXT[lang] && TEXT[lang][k]) || TEXT.zh[k] || k, [lang])
@@ -528,11 +549,13 @@ window.__ModuleLoader__.load({
         return () => clearTimeout(id)
       }, [nextSwitch, pull])
 
-      // —— 盆的位置写入（不触发 re-render）——
+      // —— 盆的位置写入（视口坐标，不触发 re-render）——
+      // 飞行层是 position:fixed 且 portal 到 body，所以 x/y 直接用视口像素，
+      // 与舞台的 300px 完全解耦 —— 这是「能飞 1000px 以上」的结构前提。
       const setFly = useCallback((x, y, rot) => {
         const el = flyRef.current
         if (!el) return
-        el.style.transform = 'translate3d(' + (x - HEAD.x) + 'px,' + (y - HEAD.y) + 'px,0) rotate(' + rot + 'deg)'
+        el.style.transform = 'translate3d(' + (x - FLY_W / 2) + 'px,' + (y - FLY_H / 2) + 'px,0) rotate(' + rot + 'deg)'
       }, [])
       const setRunner = useCallback((x) => {
         const el = runnerRef.current
@@ -551,89 +574,91 @@ window.__ModuleLoader__.load({
         const A = makeAnimator()
         animRef.current = A
 
-        const rect = stageRef.current ? stageRef.current.getBoundingClientRect() : { left: 0, top: 0, width: STAGE_W }
-        const scale = rect.width ? STAGE_W / rect.width : 1
-        const px = (event.clientX - rect.left) * scale
-        const dir = px < HEAD.x ? -1 : 1
-        const power = 0.72 + Math.random() * 0.62
+        // 舞台坐标 → 视口坐标
+        const rect = stageRef.current
+          ? stageRef.current.getBoundingClientRect()
+          : { left: 0, top: 0, width: STAGE_W, height: STAGE_H }
+        const sc = (rect.width || STAGE_W) / STAGE_W
+        const headX = rect.left + HEAD.x * sc
+        const headY = rect.top + HEAD.y * sc
+        const groundY = rect.top + GROUND_INNER * sc
+        const peak = PEAK_H * sc
+        const rollR = 44 * sc
+
+        // 可飞区间与折叠：窗口放不下 1000px 时，盆撞左右墙反弹继续滚，
+        // 路径长度仍等于 travel（需求是「离模型 1000px 以上」，按路径算才站得住）
+        const vw = Math.max(320, window.innerWidth)
+        const lo = WALL_PAD, hi = Math.max(lo + 40, vw - WALL_PAD)
+        const L = hi - lo
+        const clickedRight = (event.clientX - rect.left) * (STAGE_W / (rect.width || STAGE_W)) >= HEAD.x
+        const dir = clickedRight ? 1 : -1
+        const travel = MIN_TRAVEL + Math.random() * (MAX_TRAVEL - MIN_TRAVEL)
+        const a0 = dir > 0 ? headX - lo : hi - headX
+        const fold = (z) => { const m = ((z % (2 * L)) + 2 * L) % (2 * L); return L - Math.abs(m - L) }
+        const xAt = (s) => (dir > 0 ? lo + fold(a0 + s) : hi - fold(a0 + s))
 
         setPhase(KNOCKED)
         sfx.clang()
         say(pick(TEXT[lang].knocked), 1500)
 
-        const b = {
-          x: HEAD.x, y: HEAD.y, rot: 0,
-          vx: dir * (240 + 210 * power) * (0.7 + Math.random() * 0.6),
-          vy: -(300 + 220 * power),
-          vr: dir * (7 + 8 * power),
-          settled: false,
-        }
+        const b = { x: headX, y: headY, rot: 0 }
         basinRef.current = b
 
-        // 阶段 1：抛物线 + 撞边/撞顶 + 落地弹跳翻滚，直到基本停住
-        const GRAV = 1500
-        let last = performance.now()
-        let elapsed = 0
-        const phys = () => new Promise((resolve) => {
-          const step = (now2) => {
-            if (!A.alive.current) return resolve(false)
-            const dt = Math.min(0.033, (now2 - last) / 1000)
-            last = now2
-            elapsed += dt * 1000
-            b.vy += GRAV * dt
-            b.x += b.vx * dt
-            b.y += b.vy * dt
-            b.rot += b.vr * dt * 57.3
-            if (b.x < BASIN_MIN) { b.x = BASIN_MIN; b.vx = Math.abs(b.vx) * 0.72; b.vr = Math.abs(b.vr) * 0.6 }
-            if (b.x > BASIN_MAX) { b.x = BASIN_MAX; b.vx = -Math.abs(b.vx) * 0.72; b.vr = -Math.abs(b.vr) * 0.6 }
-            if (b.y < TOP_Y) { b.y = TOP_Y; b.vy = Math.abs(b.vy) * 0.45 }
-            if (b.y >= FLOOR_Y) {
-              b.y = FLOOR_Y
-              if (Math.abs(b.vy) > 120) { b.vy = -Math.abs(b.vy) * 0.42; b.vx *= 0.82; b.vr = b.vr * 0.55 + b.vx * 0.02 }
-              else {
-                b.vy = 0
-                b.vx *= Math.max(0, 1 - 2.6 * dt)
-                b.vr *= Math.max(0, 1 - 2.4 * dt)
-                b.rot += b.vx * dt * 1.1
-                if (Math.abs(b.vx) < 26 && elapsed > 620) b.settled = true
-              }
-            }
-            setFly(b.x, b.y, b.rot)
-            if (b.settled) return resolve(true)
-            if (elapsed > 3600) return resolve(true)
-            requestAnimationFrame(step)
+        // 阶段 1：脚本化弹跳（不是自由物理）—— 横向按路径长度减速，
+        // 纵向四段递减 sin 弧 ⇒ 一定精确走完 travel，不会停不下来
+        const segAt = (xf) => {
+          let acc = 0
+          for (const [frac, amp] of ARCS) {
+            if (xf < acc + frac) return { u: (xf - acc) / frac, amp }
+            acc += frac
           }
-          requestAnimationFrame(step)
+          return { u: 1, amp: 0 }
+        }
+        // 时长 = 距离 ÷ 速度 得到**秒**，必须 ×1000 才是 tween 要的毫秒
+        // （漏乘会把所有时长钉在 clamp 下限：飞行恒 0.95s、追盆 0.42s 跑 1400px 变冲刺）
+        const FLIGHT_MS = clamp(travel / FLIGHT_SPEED * 1000, 900, 2200)
+        let prevX = headX
+        const flight = () => A.tween(FLIGHT_MS, (p) => {
+          const s = travel * (1 - Math.pow(1 - p, 1.6))
+          const seg = segAt(s / travel)
+          const nx = xAt(s)
+          b.x = nx
+          b.y = groundY - Math.sin(Math.PI * seg.u) * peak * seg.amp
+          b.rot += (nx - prevX) / rollR * 57.3     // 像轮子一样滚；撞墙后自动反转
+          prevX = nx
+          setFly(b.x, b.y, b.rot)
         })
 
         ;(async () => {
-          const ok1 = await phys()
-          if (!ok1) { reset(); return }
-          const landedX = clamp(b.x, BASIN_MIN, BASIN_MAX)
+          if (!(await flight())) { reset(); return }
+          const landedX = b.x
+          setFly(landedX, groundY, b.rot)          // 收尾贴地
 
-          // 阶段 2：跑过去（约 320 px/s，蹲/起身各留一点时间）
+          // 阶段 2：跑过去。盆可能贴在画面边上（半宽探出屏幕），
+          // 所以她的目标不是盆的中心，而是「自己仍完整可见」时能到的最远位置。
           setPhase(CHASE)
           sfx.scurry()
           say(pick(TEXT[lang].chase), 1600)
-          const dx = landedX - HEAD.x
-          const dur = clamp(Math.abs(dx) / 0.32, 320, 1400)
-          if (!(await A.tween(dur, (p) => setRunner(dx * easeInOut(p))))) { reset(); return }
+          const halfBody = (WHALE_X + WHALE_W / 2) * sc        // 她中心到最近一侧舞台边的距离
+          const reach = clamp(landedX, halfBody, Math.max(halfBody, vw - halfBody))
+          const dxStage = (reach - headX) / sc
+          const dur = clamp(Math.abs(dxStage) / CHASE_SPEED * 1000, 420, 2600)
+          if (!(await A.tween(dur, (p) => setRunner(dxStage * easeInOut(p))))) { reset(); return }
 
           // 阶段 3：蹲下捡起
           setPhase(PICKUP)
           if (!(await A.wait(500))) { reset(); return }
 
-          // 阶段 4：人抱着盆走回原位，盆同时划弧归位（两段同长度 ⇒ 同时到位，不会悬空等）
+          // 阶段 4：盆划弧归位，同时人走回原位（两段同长度 ⇒ 同时到位，不悬空等）
           setPhase(CARRY)
-          const backX = dx
           const sx = b.x, sy = b.y, srot = b.rot
-          const durBack = clamp(Math.abs(backX) / 0.36, 380, 1200)
+          const durBack = clamp(Math.abs(dxStage) / CARRY_SPEED * 1000, 480, 2600)
           const both = await Promise.all([
             A.tween(durBack, (p) => {
               const e = easeOut(p)
-              setFly(sx + (HEAD.x - sx) * e, sy + (HEAD.y - sy) * e - Math.sin(Math.PI * p) * 70, srot * (1 - e))
+              setFly(sx + (headX - sx) * e, sy + (headY - sy) * e - Math.sin(Math.PI * p) * 90 * sc, srot * (1 - e))
             }),
-            A.tween(durBack, (p) => setRunner(backX * (1 - easeInOut(p)))),
+            A.tween(durBack, (p) => setRunner(dxStage * (1 - easeInOut(p)))),
           ])
           if (both.some((v) => !v)) { reset(); return }
 
@@ -747,6 +772,18 @@ window.__ModuleLoader__.load({
       const basinOnHead = phase === IDLE || phase === HAPPY
       const errText = error && !(data && data.ok) ? String(error).slice(0, 170) : ''
 
+      // 飞行盆层：优先 portal 到 body（视口坐标，能飞出舞台）；react-dom 取不到时
+      // 退化为挂在舞台内 —— 功能不坏，只是飞距受舞台限制。
+      const flyNode = h('div', {
+        className: 'bw-fly', ref: flyRef, 'aria-hidden': 'true',
+        style: { visibility: flyVisible ? 'visible' : 'hidden' },
+      }, h(Basin, { uid: uid + 'f', size: FLY_W }))
+      let flyLayer = null
+      if (createPortal) {
+        try { flyLayer = createPortal(flyNode, document.body) } catch (err) { flyLayer = null }
+      }
+      if (!flyLayer) flyLayer = flyNode
+
       return h('div', {
         className: 'bw-root', style,
         onPointerDown,
@@ -790,16 +827,15 @@ window.__ModuleLoader__.load({
         h('div', { className: 'bw-stage', ref: stageRef, role: 'group', 'aria-label': t('aria') },
           h('div', { className: 'bw-runner is-' + phase, ref: runnerRef, onClick: clickWhale, title: t('title') },
             h(Whale, { uid, phase, basinOnHead })),
-          h('div', {
-            className: 'bw-fly', ref: flyRef, 'aria-hidden': 'true',
-            style: { visibility: flyVisible ? 'visible' : 'hidden' },
-          }, h(Basin, { uid: uid + 'f', size: FLY_W })),
           basinOnHead ? h('button', {
             type: 'button', className: 'bw-basin-hit', title: t('aria'), 'aria-label': t('aria'),
             onClick: clickBasin,
           }) : null,
           bubble ? h('div', { className: 'bw-bubble', role: 'status' }, bubble) : null,
         ),
+
+        // —— 飞行盆：portal 到 body 的视口固定层，所以盆能飞到舞台之外 1000px 以上 ——
+        flyLayer,
       )
 
       function row(label, value, tail) {
@@ -871,9 +907,10 @@ window.__ModuleLoader__.load({
 .bw-stage{position:relative;width:${STAGE_W}px;height:${STAGE_H}px;pointer-events:none;cursor:grab;overflow:visible;flex:none;touch-action:none}
 .bw-stage:active{cursor:grabbing}
 .bw-runner{position:absolute;left:${WHALE_X}px;bottom:0;width:${WHALE_W}px;height:${WHALE_H}px;will-change:transform;pointer-events:auto;touch-action:none}
-.bw-fly{position:absolute;left:0;top:0;width:${FLY_W}px;height:${FLY_H}px;
-  margin-left:${HEAD.x - FLY_W / 2}px;margin-top:${HEAD.y - FLY_H / 2}px;
-  pointer-events:none;will-change:transform;z-index:2}
+/* 飞行盆：视口固定层（portal 到 body），坐标由 setFly 直接写视口像素，
+   所以能飞到舞台与挂件盒之外。left/top 归零，位移全交给 transform。 */
+.bw-fly{position:fixed;left:0;top:0;width:${FLY_W}px;height:${FLY_H}px;
+  pointer-events:none;will-change:transform;z-index:9999}
 .bw-fly svg{display:block}
 .bw-basin-hit{position:absolute;left:${HEAD.x - 68}px;top:${HEAD.y - 32}px;width:136px;height:62px;
   border:0;padding:0;margin:0;background:transparent;cursor:pointer;pointer-events:auto;

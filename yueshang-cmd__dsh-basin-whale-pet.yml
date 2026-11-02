@@ -16,15 +16,18 @@ description:
     Chibi maid-whale desktop pet wearing an upside-down stainless-steel basin,
     showing DeepSeek balance, bonus and top-up wallets, observed today's spend,
     and peak vs off-peak pricing with a 24-hour band and switch countdown. Click
-    the basin to knock it away — physics, edge bounces, tumble — and the whale
+    the basin to knock it more than 1000px away — the flight layer is portaled to
+    document.body so it leaves the widget box, ricochets off the screen edges and
+    tumbles — and the whale
     girl runs after it and puts it back on her head. Tapping her refreshes the
     balance. Pure hand-written SVG artwork and WebAudio-synthesized sounds, so
     the package ships no image, audio or font assets. Read-only same-origin
     route, loopback-guarded.
   zh: >-
     头顶倒扣不锈钢盆的 Q 版女仆鲸鱼娘桌面宠物：显示 DeepSeek 余额、赠金与充值、
-    观测出的今日已用，以及峰谷时段（含 24 小时条带与切换倒计时）。点一下盆会把它击飞
-    ——抛物线、撞边弹回、翻滚落地——鲸鱼娘再跑过去把盆捡回来扣回头上；点她则刷新余额。
+    观测出的今日已用，以及峰谷时段（含 24 小时条带与切换倒计时）。点一下盆会把它击飞到
+    1000px 以外——飞行层 portal 到 body，越出挂件盒、撞屏幕边反弹、翻滚落地——
+    鲸鱼娘再追过去把盆捡回来扣回头上；点她则刷新余额。
     美术是手写 SVG，音效运行期 WebAudio 合成，包里不含任何图片/音频/字体素材。
     只读同源路由，带回环与同源校验。
 
